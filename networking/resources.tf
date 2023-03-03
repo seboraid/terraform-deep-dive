@@ -20,7 +20,7 @@ terraform {
 ##################################################################################
 
 provider "aws" {
-  profile = "deep-dive"
+#  profile = "deep-dive"
   region  = var.region
 }
 
@@ -38,7 +38,12 @@ data "aws_availability_zones" "available" {}
 data "consul_keys" "networking" {
   key {
     name = "networking"
-    path = "networking/configuration/globo-primary/net_info"
+    path = terraform.workspace == "default" ? "networking/configuration/globo-primary/net_info" : "networking/configuration/globo-primary/${terraform.workspace}/net_info"
+  }
+
+  key {
+    name = "common_tags"
+    path = "networking/configuration/globo-primary/common_tags"
   }
 }
 
@@ -47,10 +52,13 @@ data "consul_keys" "networking" {
 ##################################################################################
 
 locals {
-  cidr_block      = jsondecode(data.consul_keys.networking.var.networking)["cidr_block"]
-  private_subnets = jsondecode(data.consul_keys.networking.var.networking)["private_subnets"]
-  public_subnets  = jsondecode(data.consul_keys.networking.var.networking)["public_subnets"]
-  subnet_count    = jsondecode(data.consul_keys.networking.var.networking)["subnet_count"]
+  cidr_block   = jsondecode(data.consul_keys.networking.var.networking)["cidr_block"]
+  subnet_count = jsondecode(data.consul_keys.networking.var.networking)["subnet_count"]
+  common_tags = merge(jsondecode(data.consul_keys.networking.var.common_tags),
+    {
+      Environment = terraform.workspace
+    }
+  )
 }
 
 ##################################################################################
@@ -62,23 +70,20 @@ module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "~>2.0"
 
-  name = "globo-primary"
+  name = "globo-primary-${terraform.workspace}"
 
   cidr            = local.cidr_block
   azs             = slice(data.aws_availability_zones.available.names, 0, local.subnet_count)
-  private_subnets = local.private_subnets
-  public_subnets  = local.public_subnets
+  private_subnets = [for i in range(local.subnet_count) : cidrsubnet(local.cidr_block, 8, i + 10)]
+  public_subnets  = [for i in range(local.subnet_count) : cidrsubnet(local.cidr_block, 8, i)]
 
-  enable_nat_gateway = false
+  enable_nat_gateway = true
 
   create_database_subnet_group = false
 
-
-  tags = {
-    Environment = "Production"
-    Team        = "Network"
-  }
+  tags = local.common_tags
 }
+
 
 
 
