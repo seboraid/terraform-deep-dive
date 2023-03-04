@@ -74,6 +74,7 @@ resource "aws_launch_configuration" "webapp_lc" {
 
   user_data = file("./templates/userdata.sh")
   associate_public_ip_address = true
+  iam_instance_profile = aws_iam_instance_profile.asg.name
 }
 
 resource "aws_elb" "webapp_elb" {
