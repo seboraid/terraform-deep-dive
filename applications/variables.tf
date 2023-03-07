@@ -39,3 +39,5 @@ variable "rds_password" {
   default     = "TerraformIsNumber1!"
   description = "password, provide through your ENV variables"
 }
+
+variable "playbook_repository" {}

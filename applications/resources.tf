@@ -72,7 +72,15 @@ resource "aws_launch_configuration" "webapp_lc" {
     aws_security_group.webapp_outbound_sg.id,
   ]
 
-  user_data = file("./templates/userdata.sh")
+  user_data = templatefile("${path.module}/templates/userdata.sh",
+    {
+      wp_db_hostname      = aws_db_instance.rds.endpoint
+      wp_db_name          = "${terraform.workspace}${local.rds_db_name}"
+      wp_db_user          = var.rds_username
+      wp_db_password      = var.rds_password
+      playbook_repository = var.playbook_repository
+    }
+  )
   associate_public_ip_address = true
   iam_instance_profile = aws_iam_instance_profile.asg.name
 }
